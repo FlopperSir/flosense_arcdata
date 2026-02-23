@@ -1,7 +1,6 @@
 const API  = 'https://api.github.com/repos/FlopperSir/arcraiders-data/contents/items';
 const RAW  = 'https://raw.githubusercontent.com/FlopperSir/arcraiders-data/main/items/';
 const CDN  = 'https://cdn.arctracker.io/items/';
-const SYNC_INTERVAL = 2000;
 
 const GROUND_TYPES = [
   'Launcher','Rifle','Consumable','Launcher Ammo','Launcher Ammo','Rifle Ammo',
@@ -15,7 +14,7 @@ const rarityCol = {Common:'#8b95a5',Uncommon:'#34d399',Rare:'#60a5fa',Epic:'#c08
 const benchNames = {weapon_bench:'Weapon Bench',refiner:'Refiner',armor_bench:'Armor Bench',consumable_bench:'Consumable Bench',mod_bench:'Mod Bench'};
 
 let allItems=[], enabled={}, legacyCategories=[], globalDistance=500, activeType='All', currentMode='items';
-let connected = false, syncTimer = null;
+let fileHandle = null, syncPending = false, syncTimer = null;
 
 for(let i=0;i<22;i++) legacyCategories[i]=true;
 
@@ -30,59 +29,82 @@ function icon(item){
   return CDN+b+'.png';
 }
 
+function buildConfigJson(){
+  return JSON.stringify({
+    mode: currentMode,
+    globalDistance: globalDistance,
+    legacyCategories: legacyCategories,
+    enabled: enabled
+  });
+}
+
+async function initFileHandle(){
+  if(fileHandle) return true;
+  try{
+    const configName = (typeof CONFIG_PATH !== 'undefined') ? CONFIG_PATH.split('/').pop() : 'arc_item_config.json';
+    fileHandle = await window.showSaveFilePicker({
+      suggestedName: configName,
+      startIn: 'desktop',
+      types:[{description:'JSON',accept:{'application/json':['.json']}}]
+    });
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+async function writeConfigToFile(){
+  if(!fileHandle) return false;
+  try{
+    const writable = await fileHandle.createWritable();
+    await writable.write(buildConfigJson());
+    await writable.close();
+    updateSyncStatus(true);
+    return true;
+  }catch(e){
+    updateSyncStatus(false);
+    return false;
+  }
+}
+
+function updateSyncStatus(ok){
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncTxt');
+  if(!dot||!txt) return;
+  if(ok){
+    dot.style.background='var(--green)';
+    txt.textContent='Synced with cheat';
+  } else {
+    dot.style.background='var(--red)';
+    txt.textContent='Click here to connect';
+    txt.style.cursor='pointer';
+    txt.onclick=async function(){await initFileHandle();await writeConfigToFile();};
+    dot.style.cursor='pointer';
+    dot.onclick=txt.onclick;
+  }
+}
+
+function scheduleSync(){
+  syncPending=true;
+  if(syncTimer) return;
+  syncTimer=setTimeout(async()=>{
+    syncTimer=null;
+    if(syncPending){
+      syncPending=false;
+      if(fileHandle) await writeConfigToFile();
+    }
+  },500);
+}
+
 function switchMode(mode){
   currentMode=mode;
   document.getElementById('tabItems').classList.toggle('active',mode==='items');
   document.getElementById('tabLegacy').classList.toggle('active',mode==='legacy');
   document.getElementById('itemsView').style.display=mode==='items'?'':'none';
   document.getElementById('legacyView').style.display=mode==='legacy'?'':'none';
-  syncToServer();
+  scheduleSync();
 }
 window.switchMode=switchMode;
-
-function updateConnection(ok){
-  connected=ok;
-  const dot=document.getElementById('connDot');
-  const sub=document.getElementById('heroSub');
-  if(ok){
-    dot.style.background='var(--green)';
-    sub.innerHTML='<span class="conn-dot" style="background:var(--green)"></span>Connected to cheat &middot; '+allItems.length+' items loaded';
-  } else {
-    dot.style.background='var(--red)';
-    sub.innerHTML='<span class="conn-dot" style="background:var(--red)"></span>Not connected to cheat';
-  }
-}
-
-async function syncToServer(){
-  if(typeof SERVER==='undefined') return;
-  try{
-    const payload={
-      mode: currentMode,
-      globalDistance: globalDistance,
-      legacyCategories: legacyCategories,
-      enabled: enabled
-    };
-    const res=await fetch(SERVER+'/config',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(payload)
-    });
-    if(res.ok) updateConnection(true);
-    else updateConnection(false);
-  }catch(e){
-    updateConnection(false);
-  }
-}
-
-async function pingServer(){
-  if(typeof SERVER==='undefined') return;
-  try{
-    const res=await fetch(SERVER+'/ping',{method:'GET'});
-    updateConnection(res.ok);
-  }catch(e){
-    updateConnection(false);
-  }
-}
 
 function buildPills(){
   const types=['All'];
@@ -128,27 +150,21 @@ function render(){
   const items=getFiltered();
   const grid=document.getElementById('grid');
   const noR=document.getElementById('noRes');
-
   const totalOn=Object.values(enabled).filter(Boolean).length;
   document.getElementById('sTotal').textContent=allItems.length;
   document.getElementById('sOn').textContent=totalOn;
   document.getElementById('sOff').textContent=allItems.length-totalOn;
-
   if(!items.length){grid.style.display='none';noR.style.display='';return;}
   grid.style.display='';noR.style.display='none';
-
   grid.innerHTML='';
   const frag=document.createDocumentFragment();
-
   for(const it of items){
     const on=enabled[it.id]!==false;
     const name=esc(nm(it));
     const card=document.createElement('div');
     card.className='card r-'+(it.rarity||'Common')+(on?'':' off');
-
     let meta=esc(it.type||'Unknown');
     if(it.weightKg) meta+=' &middot; '+it.weightKg+'kg';
-
     card.innerHTML=
       '<div class="rb"></div>'+
       '<img class="card-img ld" data-src="'+icon(it)+'" alt="'+name+'" loading="lazy">'+
@@ -156,12 +172,10 @@ function render(){
       '<div class="card-meta">'+meta+'</div>'+
       (it.value?'<div class="card-price">$'+it.value.toLocaleString()+'</div>':'')+
       '<div class="sw '+(on?'on':'')+'" data-id="'+it.id+'"><div class="sw-k"></div></div>';
-
     const img=card.querySelector('img');
     img.onload=function(){this.classList.remove('ld');};
     img.onerror=function(){this.classList.remove('ld');this.style.background='var(--bg)';this.removeAttribute('src');};
     img.src=img.dataset.src;
-
     card.querySelector('.sw').addEventListener('click',function(e){e.stopPropagation();toggle(this.dataset.id);});
     card.addEventListener('click',showModal.bind(null,it));
     frag.appendChild(card);
@@ -169,33 +183,10 @@ function render(){
   grid.appendChild(frag);
 }
 
-function toggle(id){enabled[id]=!enabled[id];save();render();syncToServer();}
-function toggleAll(state){for(const it of getFiltered())enabled[it.id]=state;save();render();syncToServer();}
+function toggle(id){enabled[id]=!enabled[id];save();render();scheduleSync();}
+function toggleAll(state){for(const it of getFiltered())enabled[it.id]=state;save();render();scheduleSync();}
 window.toggleAll=toggleAll;
 function save(){localStorage.setItem('arc-item-filter',JSON.stringify(enabled));}
-
-function doExport(){
-  const data={mode:currentMode,enabled,globalDistance,legacyCategories};
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='arc-item-filter.json';a.click();URL.revokeObjectURL(a.href);
-}
-window.doExport=doExport;
-
-function doImport(){
-  const inp=document.createElement('input');inp.type='file';inp.accept='.json';
-  inp.addEventListener('change',async function(){
-    const f=this.files[0];if(!f)return;
-    try{
-      const data=JSON.parse(await f.text());
-      if(data.enabled) Object.assign(enabled,data.enabled); else Object.assign(enabled,data);
-      if(typeof data.globalDistance==='number'){globalDistance=data.globalDistance;document.getElementById('globalDist').value=globalDistance;document.getElementById('distVal').textContent=globalDistance+'m';}
-      if(Array.isArray(data.legacyCategories)){for(let i=0;i<22&&i<data.legacyCategories.length;i++)legacyCategories[i]=data.legacyCategories[i];renderLegacy();}
-      if(data.mode) switchMode(data.mode);
-      save();render();syncToServer();
-    }catch(_){alert('Invalid file');}
-  });inp.click();
-}
-window.doImport=doImport;
 
 function renderLegacy(){
   const grid=document.getElementById('legacyGrid');
@@ -210,18 +201,12 @@ function renderLegacy(){
       legacyCategories[i]=!legacyCategories[i];
       localStorage.setItem('arc-legacy-cats',JSON.stringify(legacyCategories));
       renderLegacy();
-      syncToServer();
+      scheduleSync();
     });
     grid.appendChild(card);
   }
 }
-
-function legacyAll(state){
-  for(let i=0;i<22;i++) legacyCategories[i]=state;
-  localStorage.setItem('arc-legacy-cats',JSON.stringify(legacyCategories));
-  renderLegacy();
-  syncToServer();
-}
+function legacyAll(state){for(let i=0;i<22;i++)legacyCategories[i]=state;localStorage.setItem('arc-legacy-cats',JSON.stringify(legacyCategories));renderLegacy();scheduleSync();}
 window.legacyAll=legacyAll;
 
 function showModal(item){
@@ -232,7 +217,6 @@ function showModal(item){
   const d=desc(item);
   const on=enabled[item.id]!==false;
   const rc=rarityCol[item.rarity]||'#8b95a5';
-
   let html='<div class="m-head">'+
     '<img class="m-icon" src="'+icon(item)+'" onerror="this.style.background=\'var(--bg)\';this.removeAttribute(\'src\')">'+
     '<div class="m-info"><h2>'+name+'</h2>'+
@@ -241,9 +225,7 @@ function showModal(item){
     '<span class="m-badge" style="background:'+rc+'18;color:'+rc+';border:1px solid '+rc+'35">'+(item.rarity||'Common')+'</span>'+
     (item.isWeapon?'<span class="m-badge" style="background:#f8717118;color:#f87171;border:1px solid #f8717135">Weapon</span>':'')+
     '</div></div></div>';
-
   if(d) html+='<div class="m-desc">'+esc(d)+'</div>';
-
   html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>Value & Info</div>';
   if(item.value) html+='<div class="m-row"><span class="lbl">Value</span><span class="vl" style="color:var(--gold)">$'+item.value.toLocaleString()+'</span></div>';
   html+='<div class="m-row"><span class="lbl">ESP Visible</span><span class="vl" style="color:'+(on?'var(--green)':'var(--red)')+'">'+(on?'Enabled':'Disabled')+'</span></div>';
@@ -251,60 +233,36 @@ function showModal(item){
   if(item.stackSize) html+='<div class="m-row"><span class="lbl">Stack Size</span><span class="vl">'+item.stackSize+'</span></div>';
   if(item.foundIn) html+='<div class="m-row"><span class="lbl">Found In</span><span class="vl">'+esc(item.foundIn)+'</span></div>';
   if(item.craftBench) html+='<div class="m-row"><span class="lbl">Craft Bench</span><span class="vl">'+esc(benchNames[item.craftBench]||fmtMat(item.craftBench))+'</span></div>';
-  if(item.updatedAt) html+='<div class="m-row"><span class="lbl">Updated</span><span class="vl">'+esc(item.updatedAt)+'</span></div>';
   html+='</div>';
-
-  if(item.effects && Object.keys(item.effects).length){
-    html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Effects</div>';
-    for(const[key,eff] of Object.entries(item.effects)){
-      const label=eff.en||key;
-      html+='<div class="m-row"><span class="lbl">'+esc(label)+'</span><span class="vl">'+esc(String(eff.value))+'</span></div>';
-    }
-    html+='</div>';
-  }
-
   if(item.recipe && Object.keys(item.recipe).length){
     html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/></svg>Recipe</div><div class="m-chips">';
     for(const[mat,qty] of Object.entries(item.recipe)) html+='<span class="m-chip">'+fmtMat(mat)+' x'+qty+'</span>';
     html+='</div></div>';
   }
-
   if(item.recyclesInto && Object.keys(item.recyclesInto).length){
     html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Recycle Into</div><div class="m-chips">';
     for(const[mat,qty] of Object.entries(item.recyclesInto)) html+='<span class="m-chip">'+fmtMat(mat)+' x'+qty+'</span>';
     html+='</div></div>';
   }
-
   if(item.salvagesInto && Object.keys(item.salvagesInto).length){
     html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>Salvage Into</div><div class="m-chips">';
     for(const[mat,qty] of Object.entries(item.salvagesInto)) html+='<span class="m-chip">'+fmtMat(mat)+' x'+qty+'</span>';
     html+='</div></div>';
   }
-
-  if(item.upgradeCost && Object.keys(item.upgradeCost).length){
-    html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Upgrade Cost</div><div class="m-chips">';
-    for(const[mat,qty] of Object.entries(item.upgradeCost)) html+='<span class="m-chip">'+fmtMat(mat)+' x'+qty+'</span>';
-    html+='</div></div>';
-  }
-
   body.innerHTML=html;
   foot.innerHTML='<button class="btn btn-p" id="mToggle">'+(on?'Disable in ESP':'Enable in ESP')+'</button>';
-
   document.getElementById('mToggle').addEventListener('click',function(){toggle(item.id);showModal(item);});
   document.getElementById('modalX').addEventListener('click',closeModal);
   bg.classList.add('open');
 }
-
 function closeModal(){document.getElementById('modalBg').classList.remove('open');}
 
 async function init(){
   const savedCats=localStorage.getItem('arc-legacy-cats');
-  if(savedCats) try{const arr=JSON.parse(savedCats);for(let i=0;i<22&&i<arr.length;i++)legacyCategories[i]=arr[i];}catch(_){}
+  if(savedCats) try{const arr=JSON.parse(savedCats);for(let i=0;i<22&&i<arr.length;i++)legacyCategories[i]=arr[i];}catch(e){}
 
   renderLegacy();
   switchMode('items');
-
-  pingServer();
 
   const res=await fetch(API,{headers:{Accept:'application/vnd.github.v3+json'}});
   const files=(await res.json()).filter(f=>f.name.endsWith('.json'));
@@ -323,28 +281,30 @@ async function init(){
   }
 
   const saved=localStorage.getItem('arc-item-filter');
-  if(saved) try{enabled=JSON.parse(saved);}catch(_){}
+  if(saved) try{enabled=JSON.parse(saved);}catch(e){}
   const savedDist=localStorage.getItem('arc-global-distance');
   if(savedDist){const v=parseInt(savedDist);if(v>=1&&v<=1000) globalDistance=v;}
   document.getElementById('globalDist').value=globalDistance;
   document.getElementById('distVal').textContent=globalDistance+'m';
   for(const it of allItems) if(!(it.id in enabled)) enabled[it.id]=true;
 
+  document.getElementById('heroSub').textContent=allItems.length+' items loaded';
+
   buildPills();
   render();
   document.getElementById('ldScreen').style.display='none';
   document.getElementById('grid').style.display='';
 
-  syncToServer();
-
-  syncTimer=setInterval(pingServer, SYNC_INTERVAL);
+  const ok = await initFileHandle();
+  if(ok) await writeConfigToFile();
+  else updateSyncStatus(false);
 }
 
 document.getElementById('globalDist').addEventListener('input',function(){
   globalDistance=parseInt(this.value);
   document.getElementById('distVal').textContent=globalDistance+'m';
   localStorage.setItem('arc-global-distance',String(globalDistance));
-  syncToServer();
+  scheduleSync();
 });
 document.getElementById('searchInput').addEventListener('input',render);
 document.getElementById('sortSelect').addEventListener('change',render);
