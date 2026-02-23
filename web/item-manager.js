@@ -1,33 +1,28 @@
 const API  = 'https://api.github.com/repos/FlopperSir/arcraiders-data/contents/items';
 const RAW  = 'https://raw.githubusercontent.com/FlopperSir/arcraiders-data/main/items/';
 const CDN  = 'https://cdn.arctracker.io/items/';
+const SYNC_INTERVAL = 2000;
 
-const LANGS = {
-  en:'English',es:'Español',de:'Deutsch',fr:'Français',pt:'Português','pt-BR':'Português (BR)',
-  it:'Italiano',ja:'日本語','ko-KR':'한국어','zh-CN':'中文(简)','zh-TW':'中文(繁)',
-  ru:'Русский',uk:'Українська',pl:'Polski',tr:'Türkçe',da:'Dansk',no:'Norsk',
-  hr:'Hrvatski',sr:'Srpski',he:'עברית'
-};
-
-const UI = {
-  en:{search:'Search items by name, type, rarity...',sortName:'Name A-Z',sortNameD:'Name Z-A',sortPriceH:'Price: High to Low',sortPriceL:'Price: Low to High',sortRarity:'Rarity',sortType:'Type',items:'items',enabled:'enabled',disabled:'disabled',shown:'shown',enableAll:'Enable All',disableAll:'Disable All',export:'Export',import:'Import',all:'All',loading:'Loading items from GitHub...',noResults:'No items match your search.',value:'Value',espVis:'ESP Visible',on:'Enabled',off:'Disabled',weight:'Weight',stack:'Stack Size',foundIn:'Found In',craftBench:'Craft Bench',recipe:'Recipe',recycle:'Recycle Into',salvage:'Salvage Into',upgrade:'Upgrade Cost',effects:'Effects',enableEsp:'Enable in ESP',disableEsp:'Disable in ESP',badge:'ESP ITEM MANAGER',heroSub:'Toggle items on/off to control ESP visibility',updated:'Updated',distance:'Distance',meters:'m'},
-  es:{search:'Buscar items por nombre, tipo, rareza...',sortName:'Nombre A-Z',sortNameD:'Nombre Z-A',sortPriceH:'Precio: Mayor a Menor',sortPriceL:'Precio: Menor a Mayor',sortRarity:'Rareza',sortType:'Tipo',items:'items',enabled:'activos',disabled:'inactivos',shown:'mostrados',enableAll:'Activar Todo',disableAll:'Desactivar Todo',export:'Exportar',import:'Importar',all:'Todos',loading:'Cargando items desde GitHub...',noResults:'No se encontraron items.',value:'Valor',espVis:'ESP Visible',on:'Activado',off:'Desactivado',weight:'Peso',stack:'Cantidad Max',foundIn:'Encontrado En',craftBench:'Mesa de Crafteo',recipe:'Receta',recycle:'Reciclar En',salvage:'Desguazar En',upgrade:'Costo de Mejora',effects:'Efectos',enableEsp:'Activar en ESP',disableEsp:'Desactivar en ESP',badge:'GESTOR DE ITEMS ESP',heroSub:'Activa o desactiva items para controlar la visibilidad del ESP',updated:'Actualizado',distance:'Distancia',meters:'m'},
-  de:{search:'Items nach Name, Typ, Seltenheit suchen...',sortName:'Name A-Z',sortNameD:'Name Z-A',sortPriceH:'Preis: Hoch-Niedrig',sortPriceL:'Preis: Niedrig-Hoch',sortRarity:'Seltenheit',sortType:'Typ',items:'Items',enabled:'aktiv',disabled:'inaktiv',shown:'angezeigt',enableAll:'Alle aktivieren',disableAll:'Alle deaktivieren',export:'Exportieren',import:'Importieren',all:'Alle',loading:'Lade Items von GitHub...',noResults:'Keine passenden Items.',value:'Wert',espVis:'ESP Sichtbar',on:'Aktiviert',off:'Deaktiviert',weight:'Gewicht',stack:'Stapelgröße',foundIn:'Fundort',craftBench:'Werkbank',recipe:'Rezept',recycle:'Recyceln zu',salvage:'Verwerten zu',upgrade:'Upgrade-Kosten',effects:'Effekte',enableEsp:'Im ESP aktivieren',disableEsp:'Im ESP deaktivieren',badge:'ESP ITEM MANAGER',heroSub:'Items ein/ausschalten um ESP-Sichtbarkeit zu steuern',updated:'Aktualisiert',distance:'Entfernung',meters:'m'},
-  fr:{search:'Rechercher par nom, type, rareté...',sortName:'Nom A-Z',sortNameD:'Nom Z-A',sortPriceH:'Prix: Décroissant',sortPriceL:'Prix: Croissant',sortRarity:'Rareté',sortType:'Type',items:'objets',enabled:'activés',disabled:'désactivés',shown:'affichés',enableAll:'Tout activer',disableAll:'Tout désactiver',export:'Exporter',import:'Importer',all:'Tous',loading:'Chargement depuis GitHub...',noResults:'Aucun objet trouvé.',value:'Valeur',espVis:'ESP Visible',on:'Activé',off:'Désactivé',weight:'Poids',stack:'Taille pile',foundIn:'Trouvé dans',craftBench:'Établi',recipe:'Recette',recycle:'Recycler en',salvage:'Récupérer en',upgrade:'Coût amélioration',effects:'Effets',enableEsp:'Activer ESP',disableEsp:'Désactiver ESP',badge:'GESTIONNAIRE ESP',heroSub:'Activez/désactivez les objets pour contrôler la visibilité ESP',updated:'Mis à jour',distance:'Distance',meters:'m'},
-  ru:{search:'Поиск по названию, типу, редкости...',sortName:'Имя А-Я',sortNameD:'Имя Я-А',sortPriceH:'Цена: по убыванию',sortPriceL:'Цена: по возрастанию',sortRarity:'Редкость',sortType:'Тип',items:'предметов',enabled:'включено',disabled:'выключено',shown:'показано',enableAll:'Включить все',disableAll:'Выключить все',export:'Экспорт',import:'Импорт',all:'Все',loading:'Загрузка предметов с GitHub...',noResults:'Ничего не найдено.',value:'Цена',espVis:'ESP Видимость',on:'Включено',off:'Выключено',weight:'Вес',stack:'Размер стопки',foundIn:'Найдено в',craftBench:'Верстак',recipe:'Рецепт',recycle:'Переработка',salvage:'Утилизация',upgrade:'Стоимость улучшения',effects:'Эффекты',enableEsp:'Включить в ESP',disableEsp:'Выключить в ESP',badge:'МЕНЕДЖЕР ПРЕДМЕТОВ ESP',heroSub:'Включайте/выключайте предметы для управления видимостью ESP',updated:'Обновлено',distance:'Дистанция',meters:'м'},
-  ja:{search:'名前、タイプ、レアリティで検索...',sortName:'名前 A-Z',sortNameD:'名前 Z-A',sortPriceH:'価格: 高い順',sortPriceL:'価格: 安い順',sortRarity:'レアリティ',sortType:'タイプ',items:'アイテム',enabled:'有効',disabled:'無効',shown:'表示中',enableAll:'全て有効',disableAll:'全て無効',export:'エクスポート',import:'インポート',all:'全て',loading:'GitHubからアイテムを読み込み中...',noResults:'該当するアイテムがありません。',value:'価値',espVis:'ESP表示',on:'有効',off:'無効',weight:'重量',stack:'スタック数',foundIn:'入手先',craftBench:'作業台',recipe:'レシピ',recycle:'リサイクル',salvage:'解体',upgrade:'アップグレード費用',effects:'効果',enableEsp:'ESPで有効化',disableEsp:'ESPで無効化',badge:'ESP アイテム管理',heroSub:'アイテムのオン/オフでESP表示を制御',updated:'更新日',distance:'距離',meters:'m'}
-};
+const GROUND_TYPES = [
+  'Launcher','Rifle','Consumable','Launcher Ammo','Launcher Ammo','Rifle Ammo',
+  'Throwable','Deployable','Modification','Gadget','Armor','Crafting Reagent',
+  'Backpack','Crafting Part','Misc','Melee','Generator','Currency','Recipe',
+  'MetaItem','Unarmed','Augment'
+];
 
 const rarityOrd = {Common:0,Uncommon:1,Rare:2,Epic:3,Legendary:4};
 const rarityCol = {Common:'#8b95a5',Uncommon:'#34d399',Rare:'#60a5fa',Epic:'#c084fc',Legendary:'#fbbf24'};
 const benchNames = {weapon_bench:'Weapon Bench',refiner:'Refiner',armor_bench:'Armor Bench',consumable_bench:'Consumable Bench',mod_bench:'Mod Bench'};
 
-let allItems=[], enabled={}, globalDistance=500, activeType='All', lang='en';
+let allItems=[], enabled={}, legacyCategories=[], globalDistance=500, activeType='All', currentMode='items';
+let connected = false, syncTimer = null;
 
-function t(k){ return (UI[lang] && UI[lang][k]) || UI.en[k] || k; }
-function nm(item){ return (item.name && (item.name[lang] || item.name.en)) || item.id.replace(/_/g,' '); }
-function desc(item){ return (item.description && (item.description[lang] || item.description.en)) || ''; }
+for(let i=0;i<22;i++) legacyCategories[i]=true;
+
+function nm(item){ return (item.name && (item.name.en || item.name.es)) || item.id.replace(/_/g,' '); }
+function desc(item){ return (item.description && (item.description.en || item.description.es)) || ''; }
 function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function fmtMat(s){ return s.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); }
 
 function icon(item){
   if(item.imageFilename && item.imageFilename.startsWith('http')) return item.imageFilename;
@@ -35,46 +30,58 @@ function icon(item){
   return CDN+b+'.png';
 }
 
-function fmtMat(s){ return s.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); }
+function switchMode(mode){
+  currentMode=mode;
+  document.getElementById('tabItems').classList.toggle('active',mode==='items');
+  document.getElementById('tabLegacy').classList.toggle('active',mode==='legacy');
+  document.getElementById('itemsView').style.display=mode==='items'?'':'none';
+  document.getElementById('legacyView').style.display=mode==='legacy'?'':'none';
+  syncToServer();
+}
+window.switchMode=switchMode;
 
-function initLangSelect(){
-  const sel=document.getElementById('langSelect');
-  sel.innerHTML='';
-  for(const[code,label] of Object.entries(LANGS)){
-    const o=document.createElement('option');
-    o.value=code; o.textContent=label;
-    if(code===lang) o.selected=true;
-    sel.appendChild(o);
+function updateConnection(ok){
+  connected=ok;
+  const dot=document.getElementById('connDot');
+  const sub=document.getElementById('heroSub');
+  if(ok){
+    dot.style.background='var(--green)';
+    sub.innerHTML='<span class="conn-dot" style="background:var(--green)"></span>Connected to cheat &middot; '+allItems.length+' items loaded';
+  } else {
+    dot.style.background='var(--red)';
+    sub.innerHTML='<span class="conn-dot" style="background:var(--red)"></span>Not connected to cheat';
   }
 }
 
-function initSortSelect(){
-  const sel=document.getElementById('sortSelect');
-  sel.innerHTML='';
-  const opts=[['name',t('sortName')],['name-desc',t('sortNameD')],['price-desc',t('sortPriceH')],['price-asc',t('sortPriceL')],['rarity',t('sortRarity')],['type',t('sortType')]];
-  for(const[v,l] of opts){
-    const o=document.createElement('option');
-    o.value=v; o.textContent=l;
-    sel.appendChild(o);
+async function syncToServer(){
+  if(typeof SERVER==='undefined') return;
+  try{
+    const payload={
+      mode: currentMode,
+      globalDistance: globalDistance,
+      legacyCategories: legacyCategories,
+      enabled: enabled
+    };
+    const res=await fetch(SERVER+'/config',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    if(res.ok) updateConnection(true);
+    else updateConnection(false);
+  }catch(e){
+    updateConnection(false);
   }
 }
 
-function updateUI(){
-  document.getElementById('searchInput').placeholder=t('search');
-  document.getElementById('heroBadgeText').textContent=t('badge');
-  document.getElementById('heroSub').textContent=t('heroSub');
-  document.getElementById('lblTotal').textContent=t('items');
-  document.getElementById('lblOn').textContent=t('enabled');
-  document.getElementById('lblOff').textContent=t('disabled');
-  document.getElementById('lblShown').textContent=t('shown');
-  document.getElementById('btnOn').textContent=t('enableAll');
-  document.getElementById('btnOff').textContent=t('disableAll');
-  document.getElementById('btnExp').textContent=t('export');
-  document.getElementById('btnImp').textContent=t('import');
-  document.getElementById('noRes').textContent=t('noResults');
-  document.getElementById('distLabel').textContent=t('distance')+' (ESP)';
-  document.getElementById('distVal').textContent=globalDistance+t('meters');
-  initSortSelect();
+async function pingServer(){
+  if(typeof SERVER==='undefined') return;
+  try{
+    const res=await fetch(SERVER+'/ping',{method:'GET'});
+    updateConnection(res.ok);
+  }catch(e){
+    updateConnection(false);
+  }
 }
 
 function buildPills(){
@@ -87,7 +94,7 @@ function buildPills(){
   for(const tp of types){
     const el=document.createElement('div');
     el.className='pill'+(tp===activeType?' active':'');
-    el.textContent=tp==='All'?t('all'):tp;
+    el.textContent=tp==='All'?'All':tp;
     el.addEventListener('click',()=>{activeType=tp;buildPills();render();});
     box.appendChild(el);
   }
@@ -126,9 +133,6 @@ function render(){
   document.getElementById('sTotal').textContent=allItems.length;
   document.getElementById('sOn').textContent=totalOn;
   document.getElementById('sOff').textContent=allItems.length-totalOn;
-  const isFilt=items.length<allItems.length;
-  document.getElementById('sFilterWrap').style.display=isFilt?'':'none';
-  document.getElementById('sFilter').textContent=items.length;
 
   if(!items.length){grid.style.display='none';noR.style.display='';return;}
   grid.style.display='';noR.style.display='none';
@@ -165,16 +169,18 @@ function render(){
   grid.appendChild(frag);
 }
 
-function toggle(id){enabled[id]=!enabled[id];save();render();}
-function toggleAll(state){for(const it of getFiltered())enabled[it.id]=state;save();render();}
+function toggle(id){enabled[id]=!enabled[id];save();render();syncToServer();}
+function toggleAll(state){for(const it of getFiltered())enabled[it.id]=state;save();render();syncToServer();}
+window.toggleAll=toggleAll;
 function save(){localStorage.setItem('arc-item-filter',JSON.stringify(enabled));}
-function saveGlobalDist(){localStorage.setItem('arc-global-distance',String(globalDistance));}
 
 function doExport(){
-  const data={enabled,globalDistance};
+  const data={mode:currentMode,enabled,globalDistance,legacyCategories};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='arc-item-filter.json';a.click();URL.revokeObjectURL(a.href);
 }
+window.doExport=doExport;
+
 function doImport(){
   const inp=document.createElement('input');inp.type='file';inp.accept='.json';
   inp.addEventListener('change',async function(){
@@ -182,11 +188,41 @@ function doImport(){
     try{
       const data=JSON.parse(await f.text());
       if(data.enabled) Object.assign(enabled,data.enabled); else Object.assign(enabled,data);
-      if(typeof data.globalDistance==='number'){globalDistance=data.globalDistance;document.getElementById('globalDist').value=globalDistance;document.getElementById('distVal').textContent=globalDistance+t('meters');saveGlobalDist();}
-      save();render();
+      if(typeof data.globalDistance==='number'){globalDistance=data.globalDistance;document.getElementById('globalDist').value=globalDistance;document.getElementById('distVal').textContent=globalDistance+'m';}
+      if(Array.isArray(data.legacyCategories)){for(let i=0;i<22&&i<data.legacyCategories.length;i++)legacyCategories[i]=data.legacyCategories[i];renderLegacy();}
+      if(data.mode) switchMode(data.mode);
+      save();render();syncToServer();
     }catch(_){alert('Invalid file');}
   });inp.click();
 }
+window.doImport=doImport;
+
+function renderLegacy(){
+  const grid=document.getElementById('legacyGrid');
+  grid.innerHTML='';
+  for(let i=0;i<GROUND_TYPES.length;i++){
+    const on=legacyCategories[i];
+    const card=document.createElement('div');
+    card.className='leg-card'+(on?'':' off');
+    card.innerHTML='<span class="leg-name">'+esc(GROUND_TYPES[i])+'</span>'+
+      '<div class="sw '+(on?'on':'')+'" data-idx="'+i+'"><div class="sw-k"></div></div>';
+    card.addEventListener('click',function(){
+      legacyCategories[i]=!legacyCategories[i];
+      localStorage.setItem('arc-legacy-cats',JSON.stringify(legacyCategories));
+      renderLegacy();
+      syncToServer();
+    });
+    grid.appendChild(card);
+  }
+}
+
+function legacyAll(state){
+  for(let i=0;i<22;i++) legacyCategories[i]=state;
+  localStorage.setItem('arc-legacy-cats',JSON.stringify(legacyCategories));
+  renderLegacy();
+  syncToServer();
+}
+window.legacyAll=legacyAll;
 
 function showModal(item){
   const bg=document.getElementById('modalBg');
@@ -208,51 +244,51 @@ function showModal(item){
 
   if(d) html+='<div class="m-desc">'+esc(d)+'</div>';
 
-  html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>'+t('value')+' & Info</div>';
-  if(item.value) html+='<div class="m-row"><span class="lbl">'+t('value')+'</span><span class="vl" style="color:var(--gold)">$'+item.value.toLocaleString()+'</span></div>';
-  html+='<div class="m-row"><span class="lbl">'+t('espVis')+'</span><span class="vl" style="color:'+(on?'var(--green)':'var(--red)')+'">'+(on?t('on'):t('off'))+'</span></div>';
-  if(item.weightKg) html+='<div class="m-row"><span class="lbl">'+t('weight')+'</span><span class="vl">'+item.weightKg+' kg</span></div>';
-  if(item.stackSize) html+='<div class="m-row"><span class="lbl">'+t('stack')+'</span><span class="vl">'+item.stackSize+'</span></div>';
-  if(item.foundIn) html+='<div class="m-row"><span class="lbl">'+t('foundIn')+'</span><span class="vl">'+esc(item.foundIn)+'</span></div>';
-  if(item.craftBench) html+='<div class="m-row"><span class="lbl">'+t('craftBench')+'</span><span class="vl">'+esc(benchNames[item.craftBench]||fmtMat(item.craftBench))+'</span></div>';
-  if(item.updatedAt) html+='<div class="m-row"><span class="lbl">'+t('updated')+'</span><span class="vl">'+esc(item.updatedAt)+'</span></div>';
+  html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>Value & Info</div>';
+  if(item.value) html+='<div class="m-row"><span class="lbl">Value</span><span class="vl" style="color:var(--gold)">$'+item.value.toLocaleString()+'</span></div>';
+  html+='<div class="m-row"><span class="lbl">ESP Visible</span><span class="vl" style="color:'+(on?'var(--green)':'var(--red)')+'">'+(on?'Enabled':'Disabled')+'</span></div>';
+  if(item.weightKg) html+='<div class="m-row"><span class="lbl">Weight</span><span class="vl">'+item.weightKg+' kg</span></div>';
+  if(item.stackSize) html+='<div class="m-row"><span class="lbl">Stack Size</span><span class="vl">'+item.stackSize+'</span></div>';
+  if(item.foundIn) html+='<div class="m-row"><span class="lbl">Found In</span><span class="vl">'+esc(item.foundIn)+'</span></div>';
+  if(item.craftBench) html+='<div class="m-row"><span class="lbl">Craft Bench</span><span class="vl">'+esc(benchNames[item.craftBench]||fmtMat(item.craftBench))+'</span></div>';
+  if(item.updatedAt) html+='<div class="m-row"><span class="lbl">Updated</span><span class="vl">'+esc(item.updatedAt)+'</span></div>';
   html+='</div>';
 
   if(item.effects && Object.keys(item.effects).length){
-    html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>'+t('effects')+'</div>';
+    html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Effects</div>';
     for(const[key,eff] of Object.entries(item.effects)){
-      const label=eff[lang]||eff.en||key;
+      const label=eff.en||key;
       html+='<div class="m-row"><span class="lbl">'+esc(label)+'</span><span class="vl">'+esc(String(eff.value))+'</span></div>';
     }
     html+='</div>';
   }
 
   if(item.recipe && Object.keys(item.recipe).length){
-    html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/></svg>'+t('recipe')+'</div><div class="m-chips">';
+    html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/></svg>Recipe</div><div class="m-chips">';
     for(const[mat,qty] of Object.entries(item.recipe)) html+='<span class="m-chip">'+fmtMat(mat)+' x'+qty+'</span>';
     html+='</div></div>';
   }
 
   if(item.recyclesInto && Object.keys(item.recyclesInto).length){
-    html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>'+t('recycle')+'</div><div class="m-chips">';
+    html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Recycle Into</div><div class="m-chips">';
     for(const[mat,qty] of Object.entries(item.recyclesInto)) html+='<span class="m-chip">'+fmtMat(mat)+' x'+qty+'</span>';
     html+='</div></div>';
   }
 
   if(item.salvagesInto && Object.keys(item.salvagesInto).length){
-    html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>'+t('salvage')+'</div><div class="m-chips">';
+    html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>Salvage Into</div><div class="m-chips">';
     for(const[mat,qty] of Object.entries(item.salvagesInto)) html+='<span class="m-chip">'+fmtMat(mat)+' x'+qty+'</span>';
     html+='</div></div>';
   }
 
   if(item.upgradeCost && Object.keys(item.upgradeCost).length){
-    html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>'+t('upgrade')+'</div><div class="m-chips">';
+    html+='<div class="m-section"><div class="m-section-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Upgrade Cost</div><div class="m-chips">';
     for(const[mat,qty] of Object.entries(item.upgradeCost)) html+='<span class="m-chip">'+fmtMat(mat)+' x'+qty+'</span>';
     html+='</div></div>';
   }
 
   body.innerHTML=html;
-  foot.innerHTML='<button class="btn btn-p" id="mToggle">'+(on?t('disableEsp'):t('enableEsp'))+'</button>';
+  foot.innerHTML='<button class="btn btn-p" id="mToggle">'+(on?'Disable in ESP':'Enable in ESP')+'</button>';
 
   document.getElementById('mToggle').addEventListener('click',function(){toggle(item.id);showModal(item);});
   document.getElementById('modalX').addEventListener('click',closeModal);
@@ -262,12 +298,13 @@ function showModal(item){
 function closeModal(){document.getElementById('modalBg').classList.remove('open');}
 
 async function init(){
-  const savedLang=localStorage.getItem('arc-lang');
-  if(savedLang && LANGS[savedLang]) lang=savedLang;
-  initLangSelect();
-  updateUI();
+  const savedCats=localStorage.getItem('arc-legacy-cats');
+  if(savedCats) try{const arr=JSON.parse(savedCats);for(let i=0;i<22&&i<arr.length;i++)legacyCategories[i]=arr[i];}catch(_){}
 
-  document.getElementById('ldText').textContent=t('loading');
+  renderLegacy();
+  switchMode('items');
+
+  pingServer();
 
   const res=await fetch(API,{headers:{Accept:'application/vnd.github.v3+json'}});
   const files=(await res.json()).filter(f=>f.name.endsWith('.json'));
@@ -290,38 +327,28 @@ async function init(){
   const savedDist=localStorage.getItem('arc-global-distance');
   if(savedDist){const v=parseInt(savedDist);if(v>=1&&v<=1000) globalDistance=v;}
   document.getElementById('globalDist').value=globalDistance;
-  document.getElementById('distVal').textContent=globalDistance+t('meters');
+  document.getElementById('distVal').textContent=globalDistance+'m';
   for(const it of allItems) if(!(it.id in enabled)) enabled[it.id]=true;
-
-  document.getElementById('heroSub').innerHTML=allItems.length+' '+t('items')+' &middot; '+t('heroSub');
 
   buildPills();
   render();
   document.getElementById('ldScreen').style.display='none';
   document.getElementById('grid').style.display='';
+
+  syncToServer();
+
+  syncTimer=setInterval(pingServer, SYNC_INTERVAL);
 }
 
 document.getElementById('globalDist').addEventListener('input',function(){
   globalDistance=parseInt(this.value);
-  document.getElementById('distVal').textContent=globalDistance+t('meters');
-  saveGlobalDist();
+  document.getElementById('distVal').textContent=globalDistance+'m';
+  localStorage.setItem('arc-global-distance',String(globalDistance));
+  syncToServer();
 });
 document.getElementById('searchInput').addEventListener('input',render);
 document.getElementById('sortSelect').addEventListener('change',render);
-document.getElementById('langSelect').addEventListener('change',function(){
-  lang=this.value;
-  localStorage.setItem('arc-lang',lang);
-  updateUI();
-  buildPills();
-  render();
-  document.getElementById('heroSub').innerHTML=allItems.length+' '+t('items')+' &middot; '+t('heroSub');
-});
-document.getElementById('btnOn').addEventListener('click',function(){toggleAll(true);});
-document.getElementById('btnOff').addEventListener('click',function(){toggleAll(false);});
-document.getElementById('btnExp').addEventListener('click',doExport);
-document.getElementById('btnImp').addEventListener('click',doImport);
 document.getElementById('modalBg').addEventListener('click',function(e){if(e.target===this)closeModal();});
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
 
 init();
-
