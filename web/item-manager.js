@@ -100,8 +100,8 @@ function switchMode(mode){
   currentMode=mode;
   document.getElementById('tabItems').classList.toggle('active',mode==='items');
   document.getElementById('tabLegacy').classList.toggle('active',mode==='legacy');
-  document.getElementById('itemsView').style.display=mode==='items'?'':'none';
-  document.getElementById('legacyView').style.display=mode==='legacy'?'':'none';
+  document.getElementById('itemsView').style.display=mode==='items'?'block':'none';
+  document.getElementById('legacyView').style.display=mode==='legacy'?'block':'none';
   scheduleSync();
 }
 window.switchMode=switchMode;
@@ -154,8 +154,8 @@ function render(){
   document.getElementById('sTotal').textContent=allItems.length;
   document.getElementById('sOn').textContent=totalOn;
   document.getElementById('sOff').textContent=allItems.length-totalOn;
-  if(!items.length){grid.style.display='none';noR.style.display='';return;}
-  grid.style.display='';noR.style.display='none';
+  if(!items.length){grid.style.display='none';noR.style.display='block';return;}
+  grid.style.display='grid';noR.style.display='none';
   grid.innerHTML='';
   const frag=document.createDocumentFragment();
   for(const it of items){
@@ -293,7 +293,7 @@ async function init(){
   buildPills();
   render();
   document.getElementById('ldScreen').style.display='none';
-  document.getElementById('grid').style.display='';
+  document.getElementById('grid').style.display='grid';
 
   const ok = await initFileHandle();
   if(ok) await writeConfigToFile();
